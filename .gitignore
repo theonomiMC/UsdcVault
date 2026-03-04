@@ -1,0 +1,27 @@
+# Compiler files
+cache/
+out/
+broadcast/
+
+# Coverage
+lcov.info
+coverage/
+
+# Docs
+docs/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# VSCode — keep extensions, ignore personal settings
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+lcov.info
+coverage/
