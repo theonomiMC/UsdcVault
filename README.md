@@ -126,7 +126,7 @@ open coverage/index.html
 
 ---
 
-## Roadmap / Future Work
+## Roadmap / Future Work:
 
 Strategy integration — the vault currently holds USDC directly. The next step is connecting it to a yield source (Aave, Compound, etc.) with an idle buffer that keeps a percentage liquid and pushes the rest to the strategy after deposits.
 
