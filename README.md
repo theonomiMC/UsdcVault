@@ -1,6 +1,5 @@
 ![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-97.5%25-brightgreen.svg)
 
-
 # 🏛️ UsdcVault
 
 A USDC vault built on ERC-4626. Written as a learning project to understand how production vaults handle fees, share price accounting, and invariant testing.
@@ -136,3 +135,11 @@ Strategy integration — the vault currently holds USDC directly. The next step 
 
 - OpenZeppelin Contracts v5
 - Foundry
+
+---
+
+## 📍 Deployments
+
+| Network     | Contract  | Address                                      |
+| ----------- | --------- | -------------------------------------------- |
+| **Sepolia** | UsdcVault | `0x6A25F29BFB7FDbD7C2ee5Ade10E8CbCBc83e14C3` |
