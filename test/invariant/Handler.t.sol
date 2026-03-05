@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {UsdcVault} from "../../src/UsdcVault.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract UsdcInvariantHandler is StdInvariant, Test {
     UsdcVault public vault;
@@ -37,7 +36,7 @@ contract UsdcInvariantHandler is StdInvariant, Test {
         return actors[seed % actors.length];
     }
 
-    function func_deposit(uint256 amount, uint256 seed) public {
+    function funcDeposit(uint256 amount, uint256 seed) public {
         if (actors.length == 0) return;
 
         address actor = getActor(seed);
@@ -58,7 +57,7 @@ contract UsdcInvariantHandler is StdInvariant, Test {
     }
 
     /// withdraw semantics in your vault: user requests NET assets received == `amount`
-    function func_withdraw(uint256 amount, uint256 seed) public userActor(seed) {
+    function funcWithdraw(uint256 amount, uint256 seed) public userActor(seed) {
         if (actors.length == 0) return;
         address actor = getActor(seed);
 
@@ -84,7 +83,7 @@ contract UsdcInvariantHandler is StdInvariant, Test {
     }
 
     /// redeem semantics in your vault: user burns shares, receives NET assets (previewRedeem)
-    function func_redeem(uint256 shares, uint256 seed) public userActor(seed) {
+    function funcRedeem(uint256 shares, uint256 seed) public userActor(seed) {
         if (actors.length == 0) return;
         address actor = getActor(seed);
 
@@ -101,7 +100,7 @@ contract UsdcInvariantHandler is StdInvariant, Test {
         assertEq(usdc.balanceOf(actor), userBalBefore + expectedNet);
     }
 
-    function func_mint(uint256 shares, uint256 seed) public userActor(seed) {
+    function funcMint(uint256 shares, uint256 seed) public userActor(seed) {
         if (actors.length == 0) return;
         address actor = getActor(seed);
 
@@ -122,12 +121,12 @@ contract UsdcInvariantHandler is StdInvariant, Test {
         assertGt(vault.balanceOf(actor), sharesBefore);
     }
 
-    function func_simulate_profit(uint256 amount) public {
+    function funcSimulateProfit(uint256 amount) public {
         amount = bound(amount, 1, 1000e6);
         usdc.mint(address(vault), amount);
     }
 
-    function func_claimFees(uint256 seed) public {
+    function funcClaimFees(uint256 seed) public {
         // only sometimes try claiming, to avoid wasting runs
         if ((seed % 5) != 0) return;
 
