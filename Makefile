@@ -42,7 +42,13 @@ deploy:
 		--broadcast \
 		$(VERIFY_FLAG) \
 		-vvvv
-
+deploy-upgradeable:
+	@forge script script/DeployUpgradeable.s.sol:DeployUpgradeable \
+		--rpc-url $(NETWORK_RPC) \
+		--private-key $(NETWORK_KEY) \
+		--broadcast \
+		$(VERIFY_FLAG) \
+		-vvvv
 help:
 	@echo ""
 	@echo "Usage: make [target] [network=sepolia]"

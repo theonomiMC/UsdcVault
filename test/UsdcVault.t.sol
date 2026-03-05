@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 import {UsdcVault} from "../src/UsdcVault.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {UsdcVault_ZeroAddress, UsdcVault_ZeroFee, UsdcVault_InvalidGross} from "../src/UsdcVault.sol";
 
 contract UsdcVaultTest is Test {
