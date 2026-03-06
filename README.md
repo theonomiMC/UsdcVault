@@ -138,8 +138,9 @@ Strategy integration — the vault currently holds USDC directly. The next step 
 
 ---
 
-## 📍 Deployments
+## Deployment
 
-| Network     | Contract  | Address                                      |
-| ----------- | --------- | -------------------------------------------- |
-| **Sepolia** | UsdcVault | `0x6A25F29BFB7FDbD7C2ee5Ade10E8CbCBc83e14C3` |
+| Network | Contract  | Address                                                                                                                       |
+| ------- | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Sepolia | UsdcVault | [0x6E3302b5C8919591A347FB0e49425F6120c39a58](https://sepolia.etherscan.io/address/0x6E3302b5C8919591A347FB0e49425F6120c39a58) |
+| Sepolia | USDC      | [0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238](https://sepolia.etherscan.io/address/0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238) |

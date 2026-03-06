@@ -21,7 +21,7 @@ contract HelperConfig is Script {
 
     function getSepoliaConfig() public pure returns (NetworkConfig memory) {
         return NetworkConfig({
-            usdcAddress: 0x1c7d4b196cB02348377D40a0f4F1C74347788C94 // Sepolia USDC
+            usdcAddress: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238 // Sepolia USDC
         });
     }
 
