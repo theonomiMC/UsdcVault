@@ -1,1 +1,1 @@
-genhtml lcov.info.refined -o coverage_report
+genhtml lcov.info -o coverage_report

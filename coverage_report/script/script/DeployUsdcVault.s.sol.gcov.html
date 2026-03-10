@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Test Date:</td>
-            <td class="headerValue">2026-03-04 16:20:16</td>
+            <td class="headerValue">2026-03-08 17:56:32</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntryLo">0.0&nbsp;%</td>
@@ -76,16 +76,12 @@
 <span id="L14"><span class="lineNum">      14</span>              : </span>
 <span id="L15"><span class="lineNum">      15</span>              :         // 2. deploy</span>
 <span id="L16"><span class="lineNum">      16</span> <span class="tlaUNC">           0 :         vm.startBroadcast();</span></span>
-<span id="L17"><span class="lineNum">      17</span> <span class="tlaUNC">           0 :         UsdcVault vault = new UsdcVault(</span></span>
-<span id="L18"><span class="lineNum">      18</span>              :             IERC20(usdcAddress),</span>
-<span id="L19"><span class="lineNum">      19</span>              :             &quot;USDC Vault&quot;,</span>
-<span id="L20"><span class="lineNum">      20</span>              :             &quot;sUSDC&quot;</span>
-<span id="L21"><span class="lineNum">      21</span>              :         );</span>
-<span id="L22"><span class="lineNum">      22</span> <span class="tlaUNC">           0 :         vm.stopBroadcast();</span></span>
-<span id="L23"><span class="lineNum">      23</span>              : </span>
-<span id="L24"><span class="lineNum">      24</span> <span class="tlaUNC">           0 :         return (vault, helperConfig);</span></span>
-<span id="L25"><span class="lineNum">      25</span>              :     }</span>
-<span id="L26"><span class="lineNum">      26</span>              : }</span>
+<span id="L17"><span class="lineNum">      17</span> <span class="tlaUNC">           0 :         UsdcVault vault = new UsdcVault(IERC20(usdcAddress), &quot;USDC Vault&quot;, &quot;sUSDC&quot;);</span></span>
+<span id="L18"><span class="lineNum">      18</span> <span class="tlaUNC">           0 :         vm.stopBroadcast();</span></span>
+<span id="L19"><span class="lineNum">      19</span>              : </span>
+<span id="L20"><span class="lineNum">      20</span> <span class="tlaUNC">           0 :         return (vault, helperConfig);</span></span>
+<span id="L21"><span class="lineNum">      21</span>              :     }</span>
+<span id="L22"><span class="lineNum">      22</span>              : }</span>
         </pre>
               </td>
             </tr>

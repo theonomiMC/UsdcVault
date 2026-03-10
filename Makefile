@@ -43,7 +43,7 @@ deploy:
 		$(VERIFY_FLAG) \
 		-vvvv
 deploy-upgradeable:
-	@forge script script/DeployUpgradeable.s.sol:DeployUpgradeable \
+	@forge script script/upgradeable/DeployUsdcVaultV1.s.sol:DeployUsdcVaultV1 \
 		--rpc-url $(NETWORK_RPC) \
 		--private-key $(NETWORK_KEY) \
 		--broadcast \

@@ -25,3 +25,6 @@ Thumbs.db
 
 lcov.info
 coverage/
+coverage_report/
+lcov.info*
+.gas-snapshot
