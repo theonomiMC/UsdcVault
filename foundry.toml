@@ -4,6 +4,6 @@ out = "out"
 libs = ["lib"]
 
 [invariant]
-runs           = 1000   # up from default 256
-depth          = 200    # up from default 500 — more calls per sequence  
+runs  = 1000  # up from default 256
+depth = 200   # calls per sequence (default is 500 — reduced for speed)
 fail_on_revert = false

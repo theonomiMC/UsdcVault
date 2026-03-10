@@ -6,6 +6,8 @@ broadcast/
 # Coverage
 lcov.info
 coverage/
+coverage_report/
+lcov.info*
 
 # Docs
 docs/
@@ -23,8 +25,4 @@ docs/
 .DS_Store
 Thumbs.db
 
-lcov.info
-coverage/
-coverage_report/
-lcov.info*
 .gas-snapshot

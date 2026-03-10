@@ -1,8 +1,10 @@
-![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-97.5%25-brightgreen.svg)
+![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen.svg)
 
-# 🏛️ UsdcVault
+# 🏛️ UsdcVault V2 — Upgradeable
 
-A USDC vault built on ERC-4626. Written as a learning project to understand how production vaults handle fees, share price accounting, and invariant testing.
+A USDC vault built on ERC-4626 with UUPS upgradeability and strategy integration.
+Written as a learning project to understand upgradeable proxies, storage layout,
+and yield strategy patterns.
 
 ---
 
@@ -16,7 +18,7 @@ Ensure you have [Foundry](https://book.getfoundry.sh/getting-started/installatio
 
 ```bash
 git clone https://github.com/theonomiMC/UsdcVault.git
-cd usdc-vault
+cd UsdcVault
 forge install
 ```
 
@@ -28,6 +30,9 @@ Depositors put USDC in, get vault shares back. Shares accrue value as yield ente
 
 - **0.5% withdrawal fee** — taken on every exit, kept inside the vault until the owner claims it
 - **10% performance fee** — minted as shares to the owner, only when the share price hits a new all-time high (high water mark)
+- **Strategy integration** — idle funds can be invested into a yield strategy.
+  The vault pulls from the strategy automatically when a withdrawal exceeds
+  the vault's idle balance.
 
 The withdrawal fee uses a gross/net model. When you call `withdraw(100)`, you get exactly 100 USDC out. The vault burns enough extra shares to cover the fee — you don't have to think about it. `redeem(shares)` works the opposite way: you burn a fixed number of shares and receive gross minus fee.
 
@@ -38,7 +43,9 @@ The withdrawal fee uses a gross/net model. When you call `withdraw(100)`, you ge
 `totalAssets()` excludes accumulated withdrawal fees:
 
 ```
-totalAssets = balanceOf(vault) - accumulatedFees
+totalAssets = balanceOf(vault) + strategy.totalAssets() - accumulatedFees
+
+(strategy term is 0 when no strategy is set)
 ```
 
 This keeps the share price honest. Fees sitting in the vault belong to the owner, not depositors, so they're excluded from yield calculations. The owner calls `claimFees()` to pull them out.
@@ -71,40 +78,34 @@ Ownership uses `Ownable2Step` — transferring ownership requires the new owner 
 
 ## Testing
 
-The test suite has two layers:
+The test suite has three layers:
 
 **Unit tests** — one function at a time, fee math verification, access control,
-and edge cases.
+and edge cases. Covers both V1 and V2 upgrade path.
+
+**Upgrade tests** — verifies that state (shares, HWM, fees) survives the V1→V2
+upgrade with no corruption.
 
 **Invariant tests** — a stateful fuzzer runs random sequences of deposit,
-withdraw, redeem, mint, and fee claim operations. After each call,
-four invariants are checked:
-
+withdraw, redeem, mint, invest, and fee claim operations.
+After each call, three invariants are checked:
 ```
-totalAssets + accumulatedFees == balanceOf(vault)
-totalSupply == sum of all share balances
-HWM never decreases
-sharePrice > 0 when supply exists
+totalAssets + accumulatedFees == balanceOf(vault) + strategy.totalAssets()
+HWM never decreases below 1e18
+sharePrice >= 0 when supply exists
 ```
 
 **Coverage** (measured on `src/` only — test helpers and scripts excluded):
 
-| Metric    | Rate  |
-| --------- | ----- |
-| Lines     | 97.5% |
-| Functions | 95.0% |
+| Metric     | Rate   |
+|------------|--------|
+| Lines      | 100%   |
+| Statements | 99%    |
+| Branches   | 93.75% |
+| Functions  | 100%   |
 
-The two uncovered items are `getDecimalsOffset()` (a trivial view wrapper)
-and one internal handler helper — neither affects correctness.
-
-```
-totalAssets + accumulatedFees == balanceOf(vault)
-totalSupply == sum of all share balances
-HWM never decreases
-sharePrice > 0 when supply exists
-```
-
-Passed **200,000** calls across 1,000 random sequences with **no violations**.
+Passed **200,000** calls across **1,000** sequences at **200** calls deep
+with **no violations**.
 
 ---
 
@@ -115,7 +116,7 @@ Passed **200,000** calls across 1,000 random sequences with **no violations**.
 forge test
 
 # invariant suite
-forge test --match-contract UsdcVaultInvariants
+forge test --match-contract UsdcVaultV2Invariants
 
 # coverage
 forge coverage --report lcov
@@ -125,9 +126,11 @@ open coverage/index.html
 
 ---
 
-## Roadmap / Future Work:
 
-Strategy integration — the vault currently holds USDC directly. The next step is connecting it to a yield source (Aave, Compound, etc.) with an idle buffer that keeps a percentage liquid and pushes the rest to the strategy after deposits.
+## Roadmap / Future Work
+
+- ✅ Strategy integration — completed in V2
+- Frontend — Next.js + wagmi + RainbowKit interface
 
 ---
 
@@ -138,8 +141,12 @@ Strategy integration — the vault currently holds USDC directly. The next step 
 
 ---
 
-## 📍 Deployments
 
-| Network     | Contract  | Address                                      |
-| ----------- | --------- | -------------------------------------------- |
-| **Sepolia** | UsdcVault | `0x6A25F29BFB7FDbD7C2ee5Ade10E8CbCBc83e14C3` |
+## Deployments (Sepolia)
+
+| Contract       | Address                                      | Notes                     |
+|----------------|----------------------------------------------|---------------------------|
+| UsdcVault      | 0x6E3302b5C8919591A347FB0e49425F6120c39a58   | Non-upgradeable original  |
+| Proxy (V1→V2)  | 0x3D0dDdCCdCA542AB2aB1D1d328F4e4344a330589   | Always use this address   |
+| V1 Impl        | 0x46889EA2f428CfaA4a5179D4b785A97ceB7675D6   | Do not interact directly  |
+| V2 Impl        | 0xEb19A187346f4f2343E83249652377dD3eD9D038   | Do not interact directly  |

@@ -35,8 +35,8 @@ coverage:
 	genhtml lcov.info.refined -o coverage_report
 	@echo "Report: coverage_report/index.html"
 
-deploy:
-	@forge script script/DeployUsdcVault.s.sol:DeployUsdcVault \
+deploy-v2:
+	@forge script script/upgradeable/DeployUpgradeToV2.s.sol:DeployUpgradeToV2 \
 		--rpc-url $(NETWORK_RPC) \
 		--private-key $(NETWORK_KEY) \
 		--broadcast \
