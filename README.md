@@ -1,8 +1,14 @@
 ![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-97.5%25-brightgreen.svg)
 
+> [!NOTE]
+> This branch contains the original non-upgradeable vault.
+> The upgradeable version with strategy integration lives on the
+> [vault-upgradeable](https://github.com/theonomiMC/UsdcVault/tree/vault-upgradeable) branch.
+
 # 🏛️ UsdcVault
 
 A USDC vault built on ERC-4626. Written as a learning project to understand how production vaults handle fees, share price accounting, and invariant testing.
+
 
 ---
 
@@ -16,7 +22,7 @@ Ensure you have [Foundry](https://book.getfoundry.sh/getting-started/installatio
 
 ```bash
 git clone https://github.com/theonomiMC/UsdcVault.git
-cd usdc-vault
+cd UsdcVault
 forge install
 ```
 
@@ -125,9 +131,11 @@ open coverage/index.html
 
 ---
 
-## Roadmap / Future Work:
+## Roadmap / Future Work
 
-Strategy integration — the vault currently holds USDC directly. The next step is connecting it to a yield source (Aave, Compound, etc.) with an idle buffer that keeps a percentage liquid and pushes the rest to the strategy after deposits.
+- ✅ Strategy integration — completed in [vault-upgradeable](https://github.com/theonomiMC/UsdcVault/tree/vault-upgradeable) branch
+- ✅ UUPS upgradeability — proxy pattern with V1→V2 upgrade path
+- Frontend — Next.js + wagmi + RainbowKit interface (in progress)
 
 ---
 
