@@ -1,10 +1,12 @@
-![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen.svg)
+![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-98%25-brightgreen.svg)
 
 # 🏛️ UsdcVault V2 — Upgradeable
 
 A USDC vault built on ERC-4626 with UUPS upgradeability and strategy integration.
 Written as a learning project to understand upgradeable proxies, storage layout,
 and yield strategy patterns.
+
+## [Live Demo](https://usdc-vault-ui.vercel.app/)
 
 ---
 
@@ -127,10 +129,10 @@ open coverage/index.html
 ---
 
 
-## Roadmap / Future Work
+## Roadmap
 
 - ✅ Strategy integration — completed in V2
-- Frontend — Next.js + wagmi + RainbowKit interface
+- ✅ Frontend — Next.js + wagmi + RainbowKit
 
 ---
 
