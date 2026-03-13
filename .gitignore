@@ -26,3 +26,6 @@ Thumbs.db
 lcov.info
 coverage/
 lib/openzeppelin-contracts-upgradeable/
+.gas-snapshot
+coverage_report/
+lcov.info.refined
