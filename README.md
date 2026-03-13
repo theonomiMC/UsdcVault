@@ -3,7 +3,7 @@
 > [!NOTE]
 > This branch contains the original non-upgradeable vault.
 > The upgradeable version with strategy integration lives on the
-> [vault-upgradeable](https://github.com/theonomiMC/UsdcVault/tree/vault-upgradeable) branch.
+> [main](https://github.com/theonomiMC/UsdcVault/tree/main) branch.
 
 # 🏛️ UsdcVault
 
@@ -133,7 +133,7 @@ open coverage/index.html
 
 ## Roadmap / Future Work
 
-- ✅ Strategy integration — completed in [vault-upgradeable](https://github.com/theonomiMC/UsdcVault/tree/vault-upgradeable) branch
+- ✅ Strategy integration — completed in [main](https://github.com/theonomiMC/UsdcVault/tree/main) branch
 - ✅ UUPS upgradeability — proxy pattern with V1→V2 upgrade path
 - Frontend — Next.js + wagmi + RainbowKit interface (in progress)
 
