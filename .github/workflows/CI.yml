@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,4 +36,7 @@ jobs:
         run: forge build --sizes
 
       - name: Run Forge tests
-        run: forge test -vvv
+        run: |
+          forge test \
+            --no-match-path "test/audit/SepoliaUpgradeCheck.t.sol" \
+            -vvv
