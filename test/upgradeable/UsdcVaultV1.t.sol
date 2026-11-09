@@ -2,7 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {UsdcVaultV1} from "../../src/upgradeable/UsdcVaultV1.sol";
+import {UsdcVaultV1, UsdcVault_InvalidGross} from "../../src/upgradeable/UsdcVaultV1.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -297,5 +297,42 @@ contract UsdcVaultV1Test is Test {
 
     function test_getDecimalsOffset() public view {
         assertEq(proxy.getDecimalsOffset(), 3);
+    }
+
+    function test_V1_redeemDustRevertsInvalidGross() public {
+        // Deploy a fresh V1 proxy without upgrading.
+        vm.startPrank(owner);
+
+        UsdcVaultV1 impl = new UsdcVaultV1();
+
+        bytes memory data =
+            abi.encodeWithSelector(UsdcVaultV1.initialize.selector, IERC20(address(usdc)), "V1 Vault", "vUSDC");
+
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(impl), data);
+
+        vm.stopPrank();
+
+        UsdcVaultV1 v1 = UsdcVaultV1(address(proxyContract));
+
+        // Deposit 100 USDC.
+        vm.startPrank(toko);
+        usdc.approve(address(v1), 100e6);
+        v1.deposit(100e6, toko);
+        vm.stopPrank();
+
+        uint256 dustShares = 1;
+
+        assertEq(v1.previewRedeem(dustShares), 0);
+
+        uint256 sharesBefore = v1.balanceOf(toko);
+        uint256 feesBefore = v1.getAccumulatedFees();
+
+        vm.expectRevert(UsdcVault_InvalidGross.selector);
+        vm.prank(toko);
+        v1.redeem(dustShares, toko, toko);
+
+        // Confirm no shares were burned and no fees changed.
+        assertEq(v1.balanceOf(toko), sharesBefore);
+        assertEq(v1.getAccumulatedFees(), feesBefore);
     }
 }

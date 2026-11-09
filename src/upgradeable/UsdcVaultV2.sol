@@ -10,6 +10,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 error UsdcVaultV2_NoStrategy();
 /// @notice Thrown when invest amount exceeds available idle balance.
 error UsdcVaultV2_InvestExceedsAvailable();
+/// @notice Thrown when strategy asset doesn't match vault asset.
+error UsdcVaultV2_WrongAsset();
+/// @notice Thrown when trying to set a new strategy while the old one still holds assets.
+error UsdcVaultV2_StrategyNotEmpty();
+/// @notice Thrown when liquidity is insufficient.
+error UsdcVaultV2_InsufficientLiquidity();
 
 /// @title USDC Vault V2 with Strategy
 /// @author theonomiMC - Natalia
@@ -26,6 +32,15 @@ contract UsdcVaultV2 is UsdcVaultV1 {
     /// @param newStrategy strategy interface to set
     function setStrategy(IStrategy newStrategy) external onlyOwner {
         if (address(newStrategy) == address(0)) revert UsdcVault_ZeroAddress();
+        if (newStrategy.asset() != asset()) revert UsdcVaultV2_WrongAsset();
+        if (address(strategy) != address(0)) {
+            // Slither unused-return: reviewed.
+            // The strategy is trusted. Instead of relying on the returned
+            // amount, we verify that no assets remain in the old strategy.
+            // slither-disable-next-line unused-return
+            strategy.withdrawAll();
+            if (strategy.totalAssets() != 0) revert UsdcVaultV2_StrategyNotEmpty();
+        }
         strategy = newStrategy;
     }
 
@@ -69,26 +84,28 @@ contract UsdcVaultV2 is UsdcVaultV1 {
         // Step 1: figure out where funds come from
         uint256 rawBalance = IERC20(asset()).balanceOf(address(this));
         uint256 vaultBalance = rawBalance > accumulatedFees ? rawBalance - accumulatedFees : 0;
-        uint256 gross = _grossUp(assets); // This is Assets + Fee
+
+        uint256 gross = convertToAssets(shares);
         if (gross > vaultBalance && address(strategy) != address(0)) {
             uint256 shortfall = gross - vaultBalance;
-            uint256 received = strategy.withdraw(shortfall);
-
-            // Safety net — in practice unreachable via normal flow because
-            // maxWithdraw() accounts for available assets before _withdraw runs.
-            // Kept as defensive programming for direct contract calls.
-            if (received < shortfall) {
-                uint256 totalAvailable = vaultBalance + received;
-                assets = (totalAvailable * FEE_DENOMINATOR) / (FEE_DENOMINATOR + WITHDRAW_FEE);
-                gross = totalAvailable;
+            // Slither reentrancy-balance: reviewed.
+            // All external entry points reaching _withdraw() (withdraw/redeem)
+            // are protected by nonReentrant in UsdcVaultV1.
+            // A Foundry PoC confirmed that reentrant withdrawal is blocked.
+            // The strategy is trusted, and the withdrawal accounting
+            // intentionally uses values calculated before the strategy call.
+            // slither-disable-next-line reentrancy-balance
+            if (strategy.withdraw(shortfall) < shortfall) {
+                revert UsdcVaultV2_InsufficientLiquidity();
             }
         }
 
         uint256 fee = gross - assets;
-        shares = convertToShares(gross);
 
         // increase accumulated fees first
         accumulatedFees += fee;
+
+        if (caller != owner_) _spendAllowance(owner_, caller, shares);
 
         _burn(owner_, shares);
 

@@ -21,20 +21,26 @@ clean:
 	forge clean
 
 test:
-	forge test -vvv
-
+	forge test \
+		--no-match-path "test/audit/SepoliaUpgradeCheck.t.sol" \
+		-vvv
 test-invariant:
 	forge test --match-contract UsdcVaultInvariants \
 		--invariant-runs 500 \
 		--invariant-depth 100 \
 		-vvv
-
+test-sepolia:
+	forge test \
+		--match-path "test/audit/SepoliaUpgradeCheck.t.sol" \
+		--fork-url $(SEPOLIA_RPC_URL) \
+		-vvv
 coverage:
-	forge coverage --report lcov
-	lcov --remove lcov.info "test/*" "script/*" "test/mocks/*" -o lcov.info.refined
+	forge coverage \
+		--report lcov \
+		--no-match-path "test/audit/SepoliaUpgradeCheck.t.sol"
+	lcov --extract lcov.info "src/*" -o lcov.info.refined
 	genhtml lcov.info.refined -o coverage_report
 	@echo "Report: coverage_report/index.html"
-
 deploy-v2:
 	@forge script script/upgradeable/DeployUpgradeToV2.s.sol:DeployUpgradeToV2 \
 		--rpc-url $(NETWORK_RPC) \

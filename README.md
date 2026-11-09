@@ -1,4 +1,4 @@
-![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Coverage](https://img.shields.io/badge/Coverage-98%25-brightgreen.svg)
+![CI](https://github.com/theonomiMC/usdcvault/actions/workflows/CI.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg) ![Foundry](https://img.shields.io/badge/Built%20with-Foundry-FFDE00.svg) ![Branch Coverage](https://img.shields.io/badge/Branch_Coverage-90.48%25-green.svg)
 
 # 🏛️ UsdcVault V2 — Upgradeable
 
@@ -78,56 +78,6 @@ Ownership uses `Ownable2Step` — transferring ownership requires the new owner 
 
 ---
 
-## Testing
-
-The test suite has three layers:
-
-**Unit tests** — one function at a time, fee math verification, access control,
-and edge cases. Covers both V1 and V2 upgrade path.
-
-**Upgrade tests** — verifies that state (shares, HWM, fees) survives the V1→V2
-upgrade with no corruption.
-
-**Invariant tests** — a stateful fuzzer runs random sequences of deposit,
-withdraw, redeem, mint, invest, and fee claim operations.
-After each call, three invariants are checked:
-```
-totalAssets + accumulatedFees == balanceOf(vault) + strategy.totalAssets()
-HWM never decreases below 1e18
-sharePrice >= 0 when supply exists
-```
-
-**Coverage** (measured on `src/` only — test helpers and scripts excluded):
-
-| Metric     | Rate   |
-|------------|--------|
-| Lines      | 100%   |
-| Statements | 99%    |
-| Branches   | 93.75% |
-| Functions  | 100%   |
-
-Passed **200,000** calls across **1,000** sequences at **200** calls deep
-with **no violations**.
-
----
-
-## Running tests
-
-```bash
-# unit + fuzz
-forge test
-
-# invariant suite
-forge test --match-contract UsdcVaultV2Invariants
-
-# coverage
-forge coverage --report lcov
-genhtml lcov.info -o coverage/
-open coverage/index.html
-```
-
----
-
 
 ## Roadmap
 
@@ -144,11 +94,72 @@ open coverage/index.html
 ---
 
 
-## Deployments (Sepolia)
+## Deployed contracts (Sepolia)
+| Contract | Address | Notes |
+|---|---|---|
+| Proxy (V1 → V2) | `0x3D0dDdCCdCA542AB2aB1D1d328F4e4344a330589` | Always use this address. It did not change. |
+| V2 implementation (current) | `0xEDfd1C6d1bC3DcdceDa0008E7EcF292592701915` | Contains the security fixes. Verified on Etherscan. |
+| V2 implementation (old) | `0xEb19A187346f4f2343E83249652377dD3eD9D038` | Deprecated. Has known vulnerabilities. Do not use. |
+| V1 implementation | `0x46889EA2f428CfaA4a5179D4b785A97ceB7675D6` | The first implementation. The proxy does not use it any more. |
+| UsdcVault | `0x6E3302b5C8919591A347FB0e49425F6120c39a58` | Non-upgradeable original. Not part of this security review. |
 
-| Contract       | Address                                      | Notes                     |
-|----------------|----------------------------------------------|---------------------------|
-| UsdcVault      | 0x6E3302b5C8919591A347FB0e49425F6120c39a58   | Non-upgradeable original  |
-| Proxy (V1→V2)  | 0x3D0dDdCCdCA542AB2aB1D1d328F4e4344a330589   | Always use this address   |
-| V1 Impl        | 0x46889EA2f428CfaA4a5179D4b785A97ceB7675D6   | Do not interact directly  |
-| V2 Impl        | 0xEb19A187346f4f2343E83249652377dD3eD9D038   | Do not interact directly  |
+
+## Security review and fixes
+
+The vault was reviewed and tested before the upgrade. These problems were found and fixed:
+
+1. **Missing allowance check (critical).** `withdraw` and `redeem` did not check the allowance when someone acted for another owner. Anyone could withdraw another user's funds. The check is now in place.
+2. **Changing the strategy could hide funds (medium).** `setStrategy` only changed the pointer, so funds stayed in the old strategy and the share price dropped. Now it pulls all funds back from the old strategy first and checks that the new strategy uses the same asset.
+3. **`redeem` of all shares could fail (medium).** In some cases `redeem(balance)` reverted, and rounding could burn the wrong number of shares. V2 now burns exactly the shares that are requested.
+4. **High-water mark could go down (low).** In a very rare case (almost no shares left) the performance fee high-water mark could decrease. It can now only go up.
+
+### Behaviour changes
+
+- `setStrategy` moves all funds back to the vault. The owner must call `invest` again to use the new strategy.
+- `withdraw` and `redeem` now revert with `InsufficientLiquidity` if the strategy cannot return enough funds. Before, they could pay less without an error.
+
+### Known limits
+
+- One owner controls upgrades, pause and strategy changes. Users must trust this owner. This is a testnet project, so a multisig is not used.
+- `previewRedeem` and similar functions do not include a performance fee that is still waiting to be collected, so the real result can be slightly lower.
+
+
+## Tests
+
+**Coverage** (measured on `src/` only — tests, mocks and scripts excluded;
+Sepolia fork test excluded from execution):
+
+| Metric     | Rate    |
+|------------|---------|
+| Lines      | 100%    |
+| Statements | 98.73%  |
+| Branches   | 90.48%  |
+| Functions  | 100%    |
+
+Coverage measured using Foundry with reduced invariant runs (50 runs × 30 depth). The full invariant test suite runs separately with its standard configuration.
+
+- Unit tests for V1 and V2.
+- Upgrade tests - verify that the V1 -> V2 upgrade preserves existing vault state, including shares, fees, and the high water mark.
+- Stateful fuzzing of vault operations and accounting properties.
+- Sepolia upgrade verification - `test/audit/SepoliaUpgradeCheck.t.sol` validates the deployed upgrade against Sepolia state.
+
+The upgrade verification test provides an additional check of the deployed proxy and implementation, complementing local upgrade tests.
+
+Run everything with:
+
+```bash
+# Unit and fuzz tests
+make test
+
+# Invariant tests
+forge test --match-contract UsdcVaultV2Invariants
+
+# Sepolia deployment verification (fork)
+forge test \
+  --match-path test/audit/SepoliaUpgradeCheck.t.sol \
+  --fork-url "$SEPOLIA_RPC_URL" \
+  -vvv
+
+# Coverage (src/ only, Sepolia fork test excluded)
+make coverage
+```

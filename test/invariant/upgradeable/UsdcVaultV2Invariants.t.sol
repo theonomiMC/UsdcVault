@@ -47,27 +47,101 @@ contract UsdcVaultV2Invariants is StdInvariant, Test {
         actors[2] = address(0x3);
 
         handler = new StrategyInvariantHandler(vault, strategy, actors, owner);
-
-        // 5. tell Foundry to call handler functions during invariant runs
         targetContract(address(handler));
     }
 
-    // invariant 1 — accounting: assets split between vault and strategy
+    // ===================================================================== state invariants
+
+    /// accounting: depositor assets + fees == idle USDC + CURRENT strategy assets
     function invariant_totalAssets_accounting() public view {
+        MockStrategy cur = handler.strategy();
         assertEq(
             vault.totalAssets() + vault.getAccumulatedFees(),
-            usdc.balanceOf(address(vault)) + strategy.totalAssets(),
-            "Accounting invariant violated: token tracking is inconsistent"
+            usdc.balanceOf(address(vault)) + cur.totalAssets(),
+            "accounting: token tracking is inconsistent"
         );
     }
 
-    // invariant 2 — HWM never decreases
-    function invariant_hwm_neverDecreases() public view {
-        assertGe(vault.highWaterMark(), 1e18);
+    /// fees are always physically in the vault (invest() must never touch them)
+    function invariant_fees_areBacked() public view {
+        assertGe(usdc.balanceOf(address(vault)), vault.getAccumulatedFees(), "fees not backed by idle USDC");
     }
 
-    // invariant 3 — sharePrice positive when supply exists
+    /// no shares appear or vanish: tracked holders + owner (fee shares) == totalSupply
+    function invariant_sharesConserved() public view {
+        uint256 sum = vault.balanceOf(owner);
+        for (uint256 i; i < handler.actorsLength(); i++) {
+            sum += vault.balanceOf(handler.getActor(i));
+        }
+        assertEq(sum, vault.totalSupply(), "share supply != sum of holders");
+    }
+
+    /// vault can never owe more than it holds
+    function invariant_solvent() public view {
+        assertLe(vault.convertToAssets(vault.totalSupply()), vault.totalAssets(), "claims exceed assets");
+    }
+
+    /// high-water mark never decreases (replaces the old `>= 1e18` check)
+    function invariant_hwm_neverDecreases() public view {
+        assertGe(vault.highWaterMark(), handler.maxHwmSeen(), "HWM decreased");
+        assertGe(vault.highWaterMark(), 1e18, "HWM below initial");
+    }
+
+    /// share price is positive whenever there is supply and assets (replaces the `>= 0` tautology)
     function invariant_sharePrice_positive() public view {
-        assertGe(vault.sharePrice(), 0);
+        if (vault.totalSupply() > 0 && vault.totalAssets() > 0) {
+            assertGt(vault.sharePrice(), 0, "share price is zero with supply and assets");
+        }
+    }
+
+    /// M-01: a swapped-out strategy must hold nothing (no orphaned funds)
+    function invariant_noOrphanedStrategyFunds() public view {
+        for (uint256 i; i < handler.oldStrategiesLength(); i++) {
+            MockStrategy s = handler.oldStrategies(i);
+            assertEq(s.totalAssets(), 0, "old strategy still reports assets");
+            assertEq(usdc.balanceOf(address(s)), 0, "old strategy still holds USDC");
+        }
+    }
+
+    // ===================================================================== behavioural invariants (ghost counters)
+
+    function invariant_noUnauthorizedWithdraw() public view {
+        assertEq(handler.ghost_unauthorizedSuccess(), 0, "C-01: third party moved funds without allowance");
+    }
+
+    function invariant_allowanceSpentEqualsSharesBurned() public view {
+        assertEq(handler.ghost_allowanceMismatch(), 0, "allowance spent != shares burned");
+    }
+
+    function invariant_redeemAllAlwaysWorks() public view {
+        assertEq(handler.ghost_redeemAllFailed(), 0, "M-03: redeem(maxRedeem) failed");
+    }
+
+    function invariant_roundTripNeverProfitable() public view {
+        assertEq(handler.ghost_roundTripProfit(), 0, "deposit->redeem produced profit");
+    }
+
+    function invariant_strategySwapKeepsTotalAssets() public view {
+        assertEq(handler.ghost_swapAssetsDelta(), 0, "M-01: setStrategy changed totalAssets");
+    }
+
+    function invariant_pauseBlocksUserActions() public view {
+        assertEq(handler.ghost_pausedActionSucceeded(), 0, "user action succeeded while paused");
+    }
+
+    function invariant_noValueExtractedFromBystanders() public view {
+        assertEq(handler.ghost_bystanderLoss(), 0, "an action reduced a bystander's value");
+    }
+
+    function invariant_withdrawPaysExactAmount() public view {
+        assertEq(handler.ghost_withdrawMismatch(), 0, "withdraw(x) did not pay exactly x");
+    }
+
+    function invariant_redeemNeverPaysMoreThanPreview() public view {
+        assertEq(handler.ghost_redeemOverpay(), 0, "redeem paid more than previewRedeem (fee under-charge)");
+    }
+
+    function invariant_claimFeesExact() public view {
+        assertEq(handler.ghost_claimMismatch(), 0, "claimFees moved wrong amount");
     }
 }

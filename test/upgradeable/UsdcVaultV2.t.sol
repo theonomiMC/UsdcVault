@@ -3,7 +3,14 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {UsdcVaultV1} from "../../src/upgradeable/UsdcVaultV1.sol";
-import {UsdcVaultV2} from "../../src/upgradeable/UsdcVaultV2.sol";
+import {
+    UsdcVaultV2,
+    UsdcVaultV2_WrongAsset,
+    UsdcVaultV2_StrategyNotEmpty,
+    UsdcVault_InvalidGross,
+    UsdcVaultV2_InvestExceedsAvailable,
+    UsdcVaultV2_InsufficientLiquidity
+} from "../../src/upgradeable/UsdcVaultV2.sol";
 import {IStrategy} from "../../src/interfaces/IStrategy.sol";
 import {MockStrategy} from "../mocks/MockStrategy.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -93,11 +100,40 @@ contract UsdcVaultV2Test is Test {
     // 2. Strategy management
     // -----------------------------------------------------------------------
     function test_setStrategy_works() public {
-        address newAsset = makeAddr("newAsset");
-        IStrategy newStrategy = IStrategy(address(new MockStrategy(newAsset)));
+        MockStrategy nextStrategy = new MockStrategy(address(usdc));
         vm.prank(owner);
-        proxy.setStrategy(newStrategy);
-        assertEq(address(proxy.strategy()), address(newStrategy));
+        proxy.invest(500e6);
+        uint256 assets = proxy.totalAssets();
+        uint256 idle = usdc.balanceOf(address(proxy));
+
+        vm.prank(owner);
+        proxy.setStrategy(nextStrategy);
+
+        assertEq(address(proxy.strategy()), address(nextStrategy));
+        assertEq(strategy.totalAssets(), 0);
+        assertEq(usdc.balanceOf(address(strategy)), 0);
+        assertEq(usdc.balanceOf(address(proxy)), idle + 500e6);
+        assertEq(proxy.totalAssets(), assets);
+    }
+
+    function test_setStrategy_rejectsWrongAsset() public {
+        MockStrategy wrongStrategy = new MockStrategy(makeAddr("wrongAsset"));
+        vm.expectRevert(UsdcVaultV2_WrongAsset.selector);
+        vm.prank(owner);
+        proxy.setStrategy(wrongStrategy);
+        assertEq(address(proxy.strategy()), address(strategy));
+    }
+
+    function test_setStrategy_rejectsNonemptyOldStrategy() public {
+        MockStrategy nextStrategy = new MockStrategy(address(usdc));
+        vm.prank(owner);
+        proxy.invest(500e6);
+        vm.mockCall(address(strategy), abi.encodeCall(IStrategy.withdrawAll, ()), abi.encode(uint256(0)));
+        vm.expectRevert(UsdcVaultV2_StrategyNotEmpty.selector);
+        vm.prank(owner);
+        proxy.setStrategy(nextStrategy);
+        assertEq(address(proxy.strategy()), address(strategy));
+        assertEq(strategy.totalAssets(), 500e6);
     }
 
     function test_setStrategy_onlyOwner() public {
@@ -198,8 +234,8 @@ contract UsdcVaultV2Test is Test {
         vm.prank(toko);
         proxy.withdraw(available, toko, toko);
 
-        assertEq(usdc.balanceOf(toko), tokoBalanceBefore + available); // ✅
-        assertLt(available, 1000e6); // ✅ less than deposited due to loss
+        assertEq(usdc.balanceOf(toko), tokoBalanceBefore + available);
+        assertLt(available, 1000e6);
     }
 
     // -----------------------------------------------------------------------
@@ -227,5 +263,172 @@ contract UsdcVaultV2Test is Test {
         // withdraw more than strategy has → returns _totalAssets
         uint256 returned = strategy.withdraw(999999e6);
         assertEq(returned, 0);
+    }
+
+    function test_V2_redeemDustRevertsInvalidGross() public {
+        uint256 dustShares = 1;
+
+        assertEq(proxy.previewRedeem(dustShares), 0);
+
+        uint256 sharesBefore = proxy.balanceOf(toko);
+        uint256 feesBefore = proxy.getAccumulatedFees();
+
+        vm.expectRevert(UsdcVault_InvalidGross.selector);
+        vm.prank(toko);
+        proxy.redeem(dustShares, toko, toko);
+
+        assertEq(proxy.balanceOf(toko), sharesBefore);
+        assertEq(proxy.getAccumulatedFees(), feesBefore);
+    }
+
+    function test_PoC_strategyWithdrawReentrancy() public {
+        // 1. Deploy malicious strategy
+        ReentrantStrategyContract malicious = new ReentrantStrategyContract(address(usdc), address(proxy));
+
+        // 2. Replace the existing empty strategy
+        vm.prank(owner);
+        proxy.setStrategy(IStrategy(address(malicious)));
+
+        // 3. Invest 900 USDC
+        vm.prank(owner);
+        proxy.invest(900e6);
+
+        assertEq(usdc.balanceOf(address(proxy)), 100e6);
+        assertEq(malicious.totalAssets(), 900e6);
+
+        // 4. Record balances and shares
+        uint256 sharesBefore = proxy.balanceOf(toko);
+        uint256 userBalanceBefore = usdc.balanceOf(toko);
+
+        // 5. Withdraw 200 USDC
+        // The vault has only 100 USDC idle, so it must
+        // call the malicious strategy to cover the shortfall.
+        vm.prank(toko);
+        proxy.withdraw(200e6, toko, toko);
+
+        // 6. Confirm the malicious callback was executed
+        assertEq(malicious.withdrawalCalls(), 1);
+
+        // 7. Verify reentrancy was blocked
+        assertFalse(malicious.reentrySucceeded(), "CRITICAL: Reentrant withdrawal succeeded");
+
+        assertEq(
+            malicious.reentryError(), bytes4(keccak256("ReentrancyGuardReentrantCall()")), "Unexpected revert reason"
+        );
+
+        // 8. Verify the legitimate withdrawal succeeded
+        assertEq(usdc.balanceOf(toko), userBalanceBefore + 200e6);
+
+        // 9. Verify shares were burned
+        assertLt(proxy.balanceOf(toko), sharesBefore);
+    }
+
+    function test_PoC_investExceedsAvailableReverts() public {
+        uint256 available = usdc.balanceOf(address(proxy)) - proxy.getAccumulatedFees();
+
+        vm.prank(owner);
+        vm.expectRevert(UsdcVaultV2_InvestExceedsAvailable.selector);
+
+        proxy.invest(available + 1);
+    }
+
+    function test_PoC_partialStrategyWithdrawalRevertsSafely() public {
+        vm.prank(owner);
+        proxy.invest(900e6);
+
+        uint256 assets = 200e6;
+        uint256 sharesBefore = proxy.balanceOf(toko);
+        uint256 feesBefore = proxy.getAccumulatedFees();
+        uint256 supplyBefore = proxy.totalSupply();
+
+        // Strategy returns zero instead of the required liquidity.
+        vm.mockCall(address(strategy), abi.encodeWithSelector(IStrategy.withdraw.selector), abi.encode(uint256(0)));
+
+        vm.expectRevert(UsdcVaultV2_InsufficientLiquidity.selector);
+
+        vm.prank(toko);
+        proxy.withdraw(assets, toko, toko);
+
+        // Accounting must remain unchanged after revert.
+        assertEq(proxy.balanceOf(toko), sharesBefore);
+        assertEq(proxy.totalSupply(), supplyBefore);
+        assertEq(proxy.getAccumulatedFees(), feesBefore);
+    }
+
+    function test_PoC_redeemPullsLiquidityFromStrategy() public {
+        vm.prank(owner);
+        proxy.invest(900e6);
+
+        uint256 shares = proxy.previewWithdraw(200e6);
+        uint256 expectedAssets = proxy.previewRedeem(shares);
+
+        uint256 userBalanceBefore = usdc.balanceOf(toko);
+        uint256 sharesBefore = proxy.balanceOf(toko);
+        uint256 strategyBefore = strategy.totalAssets();
+
+        vm.prank(toko);
+        uint256 received = proxy.redeem(shares, toko, toko);
+
+        assertEq(received, expectedAssets);
+
+        assertEq(usdc.balanceOf(toko), userBalanceBefore + received);
+
+        assertEq(proxy.balanceOf(toko), sharesBefore - shares);
+
+        assertLt(strategy.totalAssets(), strategyBefore);
+    }
+}
+
+contract ReentrantStrategyContract {
+    IERC20 public immutable token;
+    address public immutable vault;
+
+    bool public reentrySucceeded;
+    bytes4 public reentryError;
+    uint256 public withdrawalCalls;
+
+    constructor(address _token, address _vault) {
+        token = IERC20(_token);
+        vault = _vault;
+    }
+
+    function asset() external view returns (address) {
+        return address(token);
+    }
+
+    function totalAssets() external view returns (uint256) {
+        return token.balanceOf(address(this));
+    }
+
+    function deposit(uint256) external {}
+
+    function withdraw(uint256 amount) external returns (uint256) {
+        withdrawalCalls++;
+
+        // Attack: reenter the vault before the outer
+        // withdrawal has burned the user's shares.
+        (bool success, bytes memory data) =
+            vault.call(abi.encodeWithSignature("withdraw(uint256,address,address)", 1e6, address(this), address(this)));
+
+        reentrySucceeded = success;
+
+        if (!success && data.length >= 4) {
+            bytes4 selector;
+            assembly {
+                selector := mload(add(data, 32))
+            }
+            reentryError = selector;
+        }
+
+        // Return the liquidity requested by the vault.
+        require(token.transfer(msg.sender, amount), "Transfer failed");
+
+        return amount;
+    }
+
+    function withdrawAll() external returns (uint256) {
+        uint256 balance = token.balanceOf(address(this));
+        require(token.transfer(msg.sender, balance), "Transfer failed");
+        return balance;
     }
 }

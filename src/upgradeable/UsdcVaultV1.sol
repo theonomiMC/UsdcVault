@@ -260,7 +260,10 @@ contract UsdcVaultV1 is
         uint256 totalProfitAssets = Math.mulDiv(profitPerShare, supply, 1e18 * 10 ** _decimalsOffset());
 
         uint256 feeAssets = Math.mulDiv(totalProfitAssets, PERFORMANCE_FEE, FEE_DENOMINATOR);
-
+        // Slither incorrect-equality: reviewed.
+        // Exact zero check is intentional: integer rounding may produce
+        // zero fee assets, in which case no fee shares should be minted.
+        // slither-disable-next-line incorrect-equality
         if (feeAssets == 0) return;
 
         uint256 feeShares = convertToShares(feeAssets);
@@ -268,6 +271,7 @@ contract UsdcVaultV1 is
         if (feeShares > 0) {
             _mint(owner(), feeShares);
             uint256 newHwm = sharePrice(); // post-mint price
+            if (newHwm < hwm) newHwm = hwm;
             highWaterMark = newHwm;
 
             emit HighWaterMarkUpdated(hwm, newHwm);
@@ -287,6 +291,7 @@ contract UsdcVaultV1 is
         override
     {
         if (assets == 0 && shares > 0) revert UsdcVault_InvalidGross();
+        if (caller != owner_) _spendAllowance(owner_, caller, shares);
 
         uint256 gross = convertToAssets(shares);
         uint256 fee = gross - assets;
